@@ -14,6 +14,7 @@ dbname="vasoft"
 uname="root"
 pwd="password"
 
+#функция по измерению времени работы
 def timer(func):
     t1 = time.time();
     func();
@@ -37,15 +38,15 @@ class crawler:
         self.to_crawl = [link]
         self.domain = re.search(r'https?:\/\/(www\.)?([-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b)',link).group(2)
         
-        
+    #сущность рабочего, который автономно изучает ссылки
     def worker(self,number):
         while len(self.to_crawl) > 0+number-1 and len(self.success) < max_depth:
             print('\r Got {} out of {} worker {}         '.format(len(self.success),len(self.to_crawl),number), end='')
             self.crawl_link(self.to_crawl[0+number-1])
-        
+      
+    #проверка ссылки и занесение новых из содержимого тела
     def crawl_link(self,link):
-        
-        
+        #если ссылка уже была проверена
         if self.success.get(link):
             self.remove_link(link)
             return 0
@@ -73,7 +74,7 @@ class crawler:
         self.success[link] = endpoint(domain.group(0), link, status, title)
         self.remove_link(link)
         
-        
+    #получение ссылок из тела html документа, дополнение до глобальных ссылок локальных, фильтрация домена
     def get_links(self, domain, body):
         raw_links = re.findall(r'href="([^"]*)"',body)
         links = []
@@ -102,10 +103,11 @@ class crawler:
     
     def start_task(self):
         procs = []
-        count = 0
+        #сбор минимального количества ссылок для старта многопоточной обработки. если они есть
         print('Warmup...')
         for i in range(30):
-            self.crawl_link(self.to_crawl[len(self.to_crawl)-1])
+            if len(self.to_crawl)> 0:
+                self.crawl_link(self.to_crawl[len(self.to_crawl)-1])
         print('Warmup done')
         
         for address in range(0,50):
@@ -116,7 +118,7 @@ class crawler:
             thread.join()  # дожидаемся исполнения всех потоков
         procs.clear()
 
-    
+    #выводит в датафрейм все проверенные ссылки
     def get_success(self):
         result = pd.DataFrame([
             [self.success[key].site, self.success[key].link, self.success[key].status, self.success[key].title]
@@ -124,7 +126,7 @@ class crawler:
             columns=['site','link','status','title'])
         return result
     
-    
+    #удаляет ссылку из списка задач. обработка если она была уже удалена другим потоком
     def remove_link(self,link):
         try:
             self.to_crawl.remove(link)
